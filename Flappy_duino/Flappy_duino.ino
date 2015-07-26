@@ -1,6 +1,7 @@
 #include <Adafruit_GFX.h>    // Core graphics library
 #include <Adafruit_TFTLCD.h> // Hardware-specific library
 #include <TouchScreen.h>
+#include <EEPROM.h>
 
 #ifndef USE_ADAFRUIT_SHIELD_PINOUT 
  #error "This sketch is intended for use with the TFT LCD Shield. Make sure that USE_ADAFRUIT_SHIELD_PINOUT is #defined in the Adafruit_TFTLCD.h library file."
@@ -37,12 +38,15 @@ TouchScreen ts = TouchScreen(XP, YP, XM, YM, 320);
 
 #define DRAW_LOOP_INTERVAL 50
 
+#define HS_ADDRESS 0
+
 Adafruit_TFTLCD tft;
 
 int wing;
 int fx, fy, fallRate;
 int pillarPos, gapPos;
 int score;
+int highScore = 0;
 bool running = false;
 bool crashed = false;
 bool scrPress = false;
@@ -52,6 +56,16 @@ void setup(void) {
   tft.reset();
   tft.begin(0x7575);
   tft.setRotation(1);
+  
+  // Hold touchscreen at top right at startup to clear highscores
+  digitalWrite(13, HIGH);
+  Point p = ts.getPoint();
+  digitalWrite(13, LOW);
+  pinMode(XM, OUTPUT);
+  pinMode(YP, OUTPUT);
+  if (p.x < 200 && p.y < 200)
+    EEPROM.write(HS_ADDRESS, 0);
+  
   startGame();
 }
 
@@ -63,12 +77,18 @@ void startGame() {
   gapPos = 60;
   crashed = false;
   score = 0;
+  highScore = EEPROM.read(HS_ADDRESS);
   
   tft.fillScreen(BLUE);
   tft.setTextColor(WHITE);
   tft.setTextSize(2);
   tft.setCursor(5, 5);
   tft.println("Flappy-duino: tap to begin");
+  
+  tft.setTextColor(GREEN);
+  tft.setCursor(60, 60);
+  tft.print("High Score : ");
+  tft.print(highScore);
 
   // Draw Ground  
   int ty = 230;
@@ -104,7 +124,7 @@ void loop(){
     }
     else if (!running) {
       // clear text & start scrolling
-      tft.fillRect(0,0,320,22,BLUE);
+      tft.fillRect(0,0,320,80,BLUE);
       running = true;
     }
     else
@@ -170,6 +190,13 @@ void checkCollision() {
     tft.print("Score:");
     tft.setCursor(220, 125);
     tft.print(score);
+    
+    if (score > highScore) {
+      highScore = score;
+      EEPROM.write(HS_ADDRESS, highScore);
+      tft.setCursor(75, 175);
+      tft.print("NEW HIGH!");
+    }
 
     // stop animation
     running = false;
